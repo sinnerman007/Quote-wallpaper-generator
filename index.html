@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Quote Wallpaper Generator (Mixed — Quotable + Fallback)</title>
+<style>
+  :root{
+    --bg: #061026;
+    --panel: rgba(255,255,255,0.03);
+    --muted: #9fb0c8;
+    --accent: #6dd3c5;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;
+    background:linear-gradient(180deg,#04101a,#061226);
+    color:#eaf3fb;
+    display:flex;
+    justify-content:center;
+    padding:28px;
+  }
+  .app {
+    width:100%;
+    max-width:1100px;
+  }
+  .panel {
+    background:linear-gradient(180deg, rgba(255,255,255,0.012), rgba(255,255,255,0.005));
+    border-radius:12px;
+    padding:16px;
+    box-shadow:0 8px 40px rgba(0,0,0,0.6);
+    border:1px solid rgba(255,255,255,0.03);
+  }
+  .top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+  .title{display:flex;gap:12px;align-items:center}
+  .logo{width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,#2a74a6,#5b9bd5);display:flex;align-items:center;justify-content:center;font-weight:700;font-family:serif;font-size:18px;color:white}
+  h1{font-size:18px;margin:0}
+  p.small{margin:0;color:var(--muted);font-size:13px}
+  .start-screen{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:16px;border-radius:10px;background:rgba(255,255,255,0.01)}
+  .random-words{display:flex;gap:8px;flex-wrap:wrap;max-width:70%}
+  .word{background:rgba(255,255,255,0.02);padding:8px 10px;border-radius:8px;font-size:13px;color:#dce8f2;border:1px solid rgba(255,255,255,0.02)}
+  button.btn{background:linear-gradient(180deg,#6dd3c5,#4ab3a3);color:#04262a;border:none;padding:10px 16px;border-radius:10px;font-weight:700;cursor:pointer;box-shadow: 0 6px 18px rgba(0,0,0,0.25)}
+  button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:10px 12px;border-radius:10px;cursor:pointer}
+  .controls{display:flex;gap:16px;margin-top:12px;align-items:flex-start;flex-wrap:wrap}
+  .left,.right{flex:1;min-width:280px}
+  select{padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;font-size:14px;width:100%}
+  .authors{display:flex;gap:10px;flex-wrap:wrap;padding:10px;margin-top:10px;border-radius:8px;background:rgba(255,255,255,0.01);max-height:220px;overflow:auto}
+  .author{cursor:pointer;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:linear-gradient(180deg, rgba(255,255,255,0.003), rgba(255,255,255,0.001));font-size:13px}
+  .author.selected{background:linear-gradient(90deg,#e6eef6 0%, #c9f1e9 100%);color:#08323a;font-weight:700;transform:translateY(-2px)}
+  .preview{margin-top:16px;border-radius:12px;overflow:hidden;min-height:380px;position:relative;display:flex;flex-direction:column}
+  .wall{width:100%;height:100%;padding:34px;display:flex;align-items:center;justify-content:center;text-align:center;transition:all 160ms ease;background:#081226}
+  .quote{max-width:92%;font-size:34px;line-height:1.12;color:#fff;text-shadow:0 8px 26px rgba(2,6,23,0.6);word-break:break-word}
+  .meta{margin-top:12px;font-size:14px;color:rgba(255,255,255,0.9);opacity:0.95}
+  .actions{margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .small{font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--muted);cursor:pointer}
+  footer.note{margin-top:10px;color:var(--muted);font-size:13px;text-align:center}
+  @media (max-width:880px){.top{flex-direction:column;align-items:flex-start}.controls{flex-direction:column}.quote{font-size:24px}.preview{min-height:300px}}
+</style>
+</head>
+<body>
+  <div class="app panel" id="app">
+    <div class="top">
+      <div class="title">
+        <div class="logo">QW</div>
+        <div>
+          <h1>Quote Wallpaper Generator</h1>
+          <p class="small">Mixed mode: tries online quote fetch (Quotable) → falls back to embedded sample lines if needed. HD download (PNG/JPG) included.</p>
+        </div>
+      </div>
+      <div>
+        <button class="ghost" id="resetBtn" title="Reset">Reset</button>
+      </div>
+    </div>
+
+    <!-- START -->
+    <div class="start-screen" id="startScreen">
+      <div style="flex:1">
+        <div style="font-weight:700;margin-bottom:8px">Start with a word</div>
+        <div class="random-words" id="randomWords"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+        <button class="btn" id="startBtn">Start →</button>
+        <div style="font-size:12px;color:var(--muted)">Click Start to choose a genre & author</div>
+      </div>
+    </div>
+
+    <!-- CONTROLS -->
+    <div id="controls" style="display:none" class="controls">
+      <div class="left panel">
+        <label style="font-size:13px;color:var(--muted)">Genre</label>
+        <select id="categorySelect" aria-label="Category"></select>
+
+        <div style="margin-top:12px">
+          <label style="font-size:13px;color:var(--muted)">Authors (click to select)</label>
+          <div class="authors" id="authorsList" aria-label="Authors list"></div>
+          <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end">
+            <button class="small" id="loadMoreBtn">Load more</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="right panel preview" id="previewPanel" style="display:none">
+        <div class="wall" id="wall">
+          <div>
+            <div class="quote" id="quoteText">Select an author to load a quote.</div>
+            <div class="meta" id="quoteMeta"></div>
+          </div>
+        </div>
+
+        <div style="padding:12px 8px">
+          <div class="actions" id="actionRow" style="display:none">
+            <button class="btn" id="fontBtn">Change font</button>
+            <button class="btn" id="bgBtn">Change background</button>
+            <button class="btn" id="changeQuoteBtn">Change quote</button>
+
+            <!-- Download dropdown -->
+            <div style="display:flex;align-items:center;gap:8px">
+              <select id="downloadSelect" class="small" style="padding:8px;border-radius:8px;background:transparent;color:inherit">
+                <option value="">Download</option>
+                <option value="png">Download PNG (HD 1080×1920)</option>
+                <option value="jpg">Download JPG (HD 1080×1920)</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:8px;font-size:12px;color:var(--muted)">Note: app attempts to fetch quotes online; if none found, it uses built-in sample lines so you always get a wallpaper.</div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="note">Mixed mode — Quotable API attempted (no key). Fallback lines are clearly labeled in the wallpaper meta.</footer>
+  </div>
+
+  <!-- Hidden HD canvas for export -->
+  <canvas id="hdCanvas" width="1080" height="1920" style="display:none"></canvas>
+
+<script>
+/* ===========================
+   DATA: categories & authors
+   (From user's list)
+   =========================== */
+const CATEGORIES = {
+  "Web Novel / Serial Fiction": [
+    "Er Gen","Tang Jia San Shao","I Eat Tomatoes","Wo Chi Xi Hong Shi","Pirateaba",
+    "Andrew Rowe","Zogarth","Shirtaloon","Matt Dinniman","Will Wight",
+    "Aleron Kong","Travis Bagwell","Daoist Enigma","Randidly Ghosthound","Zhaomei"
+  ],
+  "Philosophy":[
+    "Plato","Aristotle","René Descartes","Immanuel Kant","Friedrich Nietzsche",
+    "Søren Kierkegaard","John Locke","David Hume","Confucius","Thomas Aquinas",
+    "Baruch Spinoza","Jean-Jacques Rousseau","Karl Marx","Simone de Beauvoir","Michel Foucault"
+  ],
+  "Psychology":[
+    "Sigmund Freud","Carl Jung","Daniel Kahneman","Viktor Frankl","Malcolm Gladwell",
+    "B.F. Skinner","Carol Dweck","Abraham Maslow","Philip Zimbardo","Robert Cialdini",
+    "Brené Brown","Jonathan Haidt","Daniel Goleman","Alfie Kohn","Elizabeth Loftus"
+  ],
+  "Self-Help / Personal Development":[
+    "Dale Carnegie","Stephen R. Covey","James Clear","Napoleon Hill","Norman Vincent Peale",
+    "Tony Robbins","Brené Brown","Viktor Frankl","Marianne Williamson","Rhonda Byrne",
+    "Eckhart Tolle","Mark Manson","Mel Robbins","Don Miguel Ruiz","Louise Hay"
+  ],
+  "Fiction (General)":[
+    "William Shakespeare","Agatha Christie","J.K. Rowling","Charles Dickens","Jane Austen",
+    "George Orwell","Mark Twain","Harper Lee","F. Scott Fitzgerald","J.R.R. Tolkien",
+    "Ernest Hemingway","Leo Tolstoy","Gabriel García Márquez","Virginia Woolf","James Joyce"
+  ],
+  "Non-Fiction":[
+    "Malcolm Gladwell","Yuval Noah Harari","Michelle Obama","Ta-Nehisi Coates","Isabel Wilkerson",
+    "James Baldwin","Rachel Maddow","Jill Lepore","Erik Larson","Rebecca Skloot",
+    "Stacy Schiff","Tara Westover","Joan Didion","Elizabeth Kolbert","Siddhartha Mukherjee"
+  ],
+  "Fantasy":[
+    "J.R.R. Tolkien","Brandon Sanderson","Terry Pratchett","Neil Gaiman","George R.R. Martin",
+    "Robin Hobb","Ursula K. Le Guin","Patrick Rothfuss","Robert Jordan","N.K. Jemisin",
+    "Diana Wynne Jones","Guy Gavriel Kay","Tad Williams","Steven Erikson","Raymond E. Feist"
+  ],
+  "Science Fiction":[
+    "Isaac Asimov","Arthur C. Clarke","Philip K. Dick","Frank Herbert","Ursula K. Le Guin",
+    "Robert A. Heinlein","Ray Bradbury","H.G. Wells","Octavia E. Butler","Neal Stephenson",
+    "William Gibson","Douglas Adams","Liu Cixin","Kim Stanley Robinson","Andy Weir"
+  ],
+  "Romance":[
+    "Jane Austen","Nora Roberts","Julie Garwood","J.R. Ward","Nicholas Sparks",
+    "Sarah J. Maas","Lisa Kleypas","Judith McNaught","Mary Balogh","Loretta Chase",
+    "Tessa Dare","Colleen Hoover","Julia Quinn","Beverly Jenkins","Alyssa Cole"
+  ],
+  "Mystery / Thriller":[
+    "Agatha Christie","Arthur Conan Doyle","Gillian Flynn","Harlan Coben","Tana French",
+    "Raymond Chandler","Dashiell Hammett","Patricia Highsmith","Stieg Larsson","Michael Connelly",
+    "Lee Child","John Grisham","Dennis Lehane","Ruth Ware","Lucy Foley"
+  ],
+  "Horror":[
+    "Stephen King","Edgar Allan Poe","H.P. Lovecraft","Shirley Jackson","Clive Barker",
+    "Mary Shelley","Bram Stoker","Anne Rice","Joe Hill","Algernon Blackwood",
+    "Ramsey Campbell","Thomas Olde Heuvelt","Silvia Moreno-Garcia","Victor LaValle","Paul Tremblay"
+  ],
+  "Historical Fiction":[
+    "Hilary Mantel","Philippa Gregory","Ken Follett","Diana Gabaldon","Colson Whitehead",
+    "Geraldine Brooks","Kristin Hannah","Edward Rutherfurd","Sharon Kay Penman","Bernard Cornwell",
+    "Margaret George","C.W. Gortner","Kate Morton","Sarah Waters","E.L. Doctorow"
+  ],
+  "Literary Fiction":[
+    "Virginia Woolf","James Joyce","Toni Morrison","Gabriel García Márquez","Salman Rushdie",
+    "Zadie Smith","Kazuo Ishiguro","Jhumpa Lahiri","Chimamanda Ngozi Adichie","Colson Whitehead",
+    "Elena Ferrante","Haruki Murakami","Don DeLillo","Margaret Atwood","Cormac McCarthy"
+  ],
+  "Young Adult (YA)":[
+    "J.K. Rowling","Suzanne Collins","John Green","Angie Thomas","Rick Riordan",
+    "Sarah J. Maas","Jenny Han","Jason Reynolds","Nicola Yoon","Elizabeth Acevedo",
+    "Adam Silvera","Roshni Chokshi","Becky Albertalli","Marie Lu","Leigh Bardugo"
+  ],
+  "LitRPG / GameLit":[
+    "Matt Dinniman","Shirtaloon","Will Wight","Zogarth","Pirateaba",
+    "Aleron Kong","Travis Bagwell","Andrew Rowe","Seth Ring","J.F. Brink",
+    "Plum Parrot","Aaron Renfroe","Sean Oswald","Zhaomei","Randidly Ghosthound"
+  ]
+};
+
+/* -----------------------
+   UI state & settings
+   ----------------------- */
+const INITIAL_VISIBLE = 10;
+const LOAD_MORE_STEP = 5;
+
+let currentCategory = null;
+let poolAuthors = [];
+let visibleCount = 0;
+let selectedAuthor = null;
+let quotesForAuthor = []; // array of {text, source, isFallback}
+let currentQuoteIndex = 0;
+let fontIndex = 0;
+const FONTS = [
+  {name:'Georgia', css: 'Georgia, serif'},
+  {name:'Times New Roman', css: '"Times New Roman", Times, serif'},
+  {name:'Garamond', css: 'Garamond, serif'},
+  {name:'Verdana', css: 'Verdana, Geneva, sans-serif'},
+  {name:'Courier New', css: '"Courier New", Courier, monospace'},
+  {name:'Trebuchet MS', css: '"Trebuchet MS", Helvetica, sans-serif'}
+];
+const BG_PALETTE = [
+  {label:'Deep Blue', value:'#0b3b4a'},
+  {label:'Forest', value:'#0b3f2e'},
+  {label:'Sunset', value:'#6b2f20'},
+  {label:'Purple Haze', value:'#2e2340'},
+  {label:'Midnight', value:'#081226'},
+  {label:'Warm Sand', value:'#6a4b2a'},
+  {label:'Cool Teal', value:'#083a3b'},
+  {label:'Soft Coral', value:'#6b2d2d'}
+];
+let bgIndex = 0;
+
+/* ---------- Elements ---------- */
+const startScreen = document.getElementById('startScreen');
+const randomWordsEl = document.getElementById('randomWords');
+const startBtn = document.getElementById('startBtn');
+const controls = document.getElementById('controls');
+const categorySelect = document.getElementById('categorySelect');
+const authorsList = document.getElementById('authorsList');
+const loadMoreBtn = document.getElementById('loadMoreBtn');
+const previewPanel = document.getElementById('previewPanel');
+const wall = document.getElementById('wall');
+const quoteText = document.getElementById('quoteText');
+const quoteMeta = document.getElementById('quoteMeta');
+const actionRow = document.getElementById('actionRow');
+const fontBtn = document.getElementById('fontBtn');
+const bgBtn = document.getElementById('bgBtn');
+const changeQuoteBtn = document.getElementById('changeQuoteBtn');
+const downloadSelect = document.getElementById('downloadSelect');
+const resetBtn = document.getElementById('resetBtn');
+const hdCanvas = document.getElementById('hdCanvas');
+
+/* ---------- Helpers ---------- */
+function randInt(n){return Math.floor(Math.random()*n)}
+function pick(arr){return arr[randInt(arr.length)]}
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a }
+
+/* ---------- Start words ---------- */
+function fillStartWords(){
+  const words = ["books","writers","novels","poetry","philosophy","memoir","fiction","nonfiction","psychology","self-help","classics","fantasy","sci-fi","mystery","romance","game"];
+  randomWordsEl.innerHTML = '';
+  shuffle(words);
+  words.slice(0,8).forEach(w=>{
+    const el=document.createElement('div'); el.className='word'; el.textContent=w; randomWordsEl.appendChild(el);
+  });
+}
+
+/* ---------- Category UI ---------- */
+function populateCategories(){
+  categorySelect.innerHTML = '';
+  Object.keys(CATEGORIES).forEach(cat=>{
+    const opt=document.createElement('option'); opt.value=cat; opt.textContent=cat; categorySelect.appendChild(opt);
+  });
+}
+
+/* ---------- Authors list handling ---------- */
+function loadCategory(cat){
+  currentCategory = cat;
+  poolAuthors = CATEGORIES[cat].slice();
+  poolAuthors = shuffle(poolAuthors);
+  visibleCount = Math.min(INITIAL_VISIBLE, poolAuthors.length);
+  renderAuthors();
+  previewPanel.style.display = 'flex';
+  actionRow.style.display = 'flex';
+  selectedAuthor = null;
+  quotesForAuthor = [];
+  quoteText.textContent = 'Select an author to load quotes (tries online first).';
+  quoteMeta.textContent = '';
+  fontIndex = 0; bgIndex = 0;
+  fontBtn.textContent = `Font: ${FONTS[fontIndex].name}`;
+  bgBtn.textContent = `Background: ${BG_PALETTE[bgIndex].label}`;
+  wall.style.background = BG_PALETTE[bgIndex].value;
+}
+
+function renderAuthors(){
+  authorsList.innerHTML = '';
+  for(let i=0;i<visibleCount;i++){
+    const name = poolAuthors[i];
+    const b = document.createElement('div');
+    b.className='author';
+    b.textContent=name;
+    b.dataset.index=i;
+    b.addEventListener('click', ()=>selectAuthor(i));
+    authorsList.appendChild(b);
+  }
+  if(visibleCount>=poolAuthors.length){ loadMoreBtn.disabled=true; loadMoreBtn.textContent='No more authors'; }
+  else { loadMoreBtn.disabled=false; loadMoreBtn.textContent='Load more'; }
+}
+
+function loadMoreAuthors(){
+  const remaining = poolAuthors.length - visibleCount;
+  const add = Math.min(LOAD_MORE_STEP, remaining);
+  visibleCount += add;
+  renderAuthors();
+  authorsList.scrollTo({top: authorsList.scrollHeight, behavior:'smooth'});
+}
+
+/* ---------- Selecting an author ----------
+   Flow:
+   1) Mark selected in UI
+   2) Try fetch quotes via Quotable:
+       a) Find author slug via /authors?query=NAME (best-effort)
+       b) If found fetch quotes /quotes?author=SLUG&limit=50
+   3) If fetch fails or returns no quotes -> use fallback generated quotes
+*/
+async function selectAuthor(i){
+  document.querySelectorAll('.author').forEach(el=>el.classList.remove('selected'));
+  const el = document.querySelector(`.author[data-index="${i}"]`);
+  if(!el) return;
+  el.classList.add('selected');
+  selectedAuthor = poolAuthors[i];
+  quoteText.textContent = 'Loading quotes… (trying online)';
+  quoteMeta.textContent = '';
+  quotesForAuthor = [];
+  currentQuoteIndex = 0;
+  try {
+    const fetched = await fetchQuotesFromQuotable(selectedAuthor);
+    if(fetched && fetched.length){
+      quotesForAuthor = fetched.map(q=>({text:q.content, source:q.book || q.title || q._id || 'Quotable', isFallback:false}));
+    } else {
+      quotesForAuthor = makeFallbackQuotes(selectedAuthor, currentCategory);
+    }
+  } catch(err){
+    // network error or API issue -> fallback
+    quotesForAuthor = makeFallbackQuotes(selectedAuthor, currentCategory);
+  }
+  // show one
+  currentQuoteIndex = 0;
+  showCurrentQuote();
+}
+
+/* Try to find author slug and fetch quotes from Quotable */
+async function fetchQuotesFromQuotable(authorName){
+  // try to find author via authors endpoint (best-effort)
+  // Quotable supports /authors?query=... or /authors?limit=... ; we'll try query param 'query'
+  try {
+    // 1) search authors
+    const searchUrl = `https://api.quotable.io/search/authors?query=${encodeURIComponent(authorName)}`;
+    // Note: some instances of Quotable support /search/authors; fallback below if 404
+    let authorsRes = await fetch(searchUrl).catch(()=>null);
+    let authorSlug = null;
+    if(authorsRes && authorsRes.ok){
+      const json = await authorsRes.json();
+      // different responses: if results array present
+      if(json.results && json.results.length){
+        // pick best match (first)
+        authorSlug = json.results[0].slug;
+      } else if(json.count && json.count>0 && json.results){
+        authorSlug = json.results[0].slug;
+      }
+    } else {
+      // fallback: try authors list search
+      const alt = `https://api.quotable.io/authors?limit=100&query=${encodeURIComponent(authorName)}`;
+      let altRes = await fetch(alt).catch(()=>null);
+      if(altRes && altRes.ok){
+        const j = await altRes.json();
+        if(j.results && j.results.length) authorSlug = j.results[0].slug;
+        else if(j.length && j[0] && j[0].slug) authorSlug = j[0].slug;
+      }
+    }
+
+    if(!authorSlug){
+      // try slugify as last resort
+      const candidate = slugify(authorName);
+      // try quotes by candidate
+      const qurl = `https://api.quotable.io/quotes?author=${encodeURIComponent(candidate)}&limit=50`;
+      const tryRes = await fetch(qurl).catch(()=>null);
+      if(tryRes && tryRes.ok){
+        const qq = await tryRes.json();
+        if(qq.results && qq.results.length) return qq.results;
+        if(Array.isArray(qq) && qq.length) return qq;
+      }
+      // no good slug found -> return empty
+      return [];
+    }
+
+    // if we have slug, fetch quotes by slug
+    const quotesUrl = `https://api.quotable.io/quotes?author=${encodeURIComponent(authorSlug)}&limit=60`;
+    const qres = await fetch(quotesUrl);
+    if(!qres.ok) return [];
+    const qjson = await qres.json();
+    // results may be in qjson.results or qjson
+    if(qjson.results && qjson.results.length) return qjson.results;
+    if(Array.isArray(qjson) && qjson.length) return qjson;
+    return [];
+  } catch(e){
+    return [];
+  }
+}
+
+/* Simple slugify — best-effort */
+function slugify(name){
+  return name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+}
+
+/* ---------- Fallback generated quotes ----------
+   Create 5 sample lines per author (clearly labeled fallback)
+*/
+function makeFallbackQuotes(author, category){
+  const themes = {
+    "Philosophy":["reason","being","meaning","virtue","wisdom"],
+    "Psychology":["mind","memory","habit","growth","choice"],
+    "Self-Help / Personal Development":["habit","change","courage","focus","small steps"],
+    "Fiction (General)":["love","loss","time","story","memory"],
+    "Non-Fiction":["truth","context","history","insight","clarity"],
+    "Fantasy":["journey","courage","magic","destiny","labyrinth"],
+    "Science Fiction":["future","machine","choice","cosmos","scale"],
+    "Romance":["heart","promise","longing","fate","gentle"],
+    "Mystery / Thriller":["secret","shadow","clue","silence","pursuit"],
+    "Horror":["darkness","fear","whisper","night","margin"],
+    "Historical Fiction":["past","time","echo","memory","stones"],
+    "Literary Fiction":["language","loneliness","city","subjectivity","detail"],
+    "Young Adult (YA)":["growing","firsts","doubt","friendship","dare"],
+    "LitRPG / GameLit":["level","quest","xp","challenge","system"],
+    "Web Novel / Serial Fiction":["power","realm","progress","rank","trial"]
+  };
+  const t = (themes[category] || ["life","time","thought","dream","path"]);
+  const base = [
+    `When ${t[0]} is held up to the light, even small choices shine differently.`,
+    `Carry a quiet trust in ${t[1]} — it will take you farther than arrogance.`,
+    `Our days are built from tiny acts of paying attention to ${t[2]}.`,
+    `The map of ${t[3]} is drawn by the steps you take more than the plans you make.`,
+    `A single change in how you name ${t[4]} can make the horizon open.`
+  ];
+  // attach fallback marker
+  return base.map(s => ({text: s + ``, source: 'fallback', isFallback:true}));
+}
+
+/* ---------- Show quote ---------- */
+function showCurrentQuote(){
+  if(!quotesForAuthor || !quotesForAuthor.length){
+    quoteText.textContent = 'No quotes available.';
+    quoteMeta.textContent = '';
+    return;
+  }
+  const q = quotesForAuthor[currentQuoteIndex % quotesForAuthor.length];
+  quoteText.textContent = q.text;
+  const fallbackNote = q.isFallback ? ' (generated sample - fallback)' : '';
+  quoteMeta.textContent = `— ${selectedAuthor} ${fallbackNote} • source: ${q.source || 'unknown'}`;
+  // update canvas preview styling
+  quoteText.style.fontFamily = FONTS[fontIndex].css;
+  wall.style.background = BG_PALETTE[bgIndex].value;
+}
+
+/* ---------- Controls: font/bg/change quote ---------- */
+function cycleFont(){
+  fontIndex = (fontIndex + 1) % FONTS.length;
+  fontBtn.textContent = `Font: ${FONTS[fontIndex].name}`;
+  quoteText.style.fontFamily = FONTS[fontIndex].css;
+}
+function cycleBackground(){
+  bgIndex = (bgIndex + 1) % BG_PALETTE.length;
+  bgBtn.textContent = `Background: ${BG_PALETTE[bgIndex].label}`;
+  wall.style.background = BG_PALETTE[bgIndex].value;
+}
+function nextQuote(){
+  if(!quotesForAuthor || !quotesForAuthor.length){ alert('No quotes loaded for this author.'); return; }
+  currentQuoteIndex = (currentQuoteIndex + 1) % quotesForAuthor.length;
+  showCurrentQuote();
+}
+
+/* ---------- HD export (1080x1920) ----------
+   Generates an HD canvas (1080x1920), draws background & wrapped text,
+   then downloads as PNG or JPG based on selection.
+*/
+function downloadHD(format){
+  if(!quotesForAuthor || !quotesForAuthor.length){ alert('Pick an author / quote first'); return; }
+  // use hdCanvas
+  const canvas = hdCanvas;
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width = 1080;
+  const height = canvas.height = 1920;
+
+  // background
+  ctx.fillStyle = BG_PALETTE[bgIndex].value || '#081226';
+  ctx.fillRect(0,0,width,height);
+
+  // slight gradient overlay for texture
+  const g = ctx.createLinearGradient(0,0,width,height);
+  g.addColorStop(0,'rgba(255,255,255,0.02)');
+  g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,width,height);
+
+  // prepare text
+  const q = quotesForAuthor[currentQuoteIndex % quotesForAuthor.length];
+  const text = q.text;
+  const authorLine = `— ${selectedAuthor}`;
+  // choose font family (use first name token to avoid commas)
+  const chosenFont = FONTS[fontIndex].css.split(',')[0].replace(/"/g,'');
+  // choose base size based on length
+  const baseSize = determineFontSize(text);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = 'rgba(0,0,0,0.55)';
+  ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 10; ctx.shadowBlur = 24;
+
+  ctx.font = `700 ${baseSize}px ${chosenFont}`;
+  const maxTextWidth = width - 160;
+  const lines = wrapTextCanvas(ctx, text, maxTextWidth);
+  const lineHeight = Math.round(baseSize * 1.08);
+  const totalHeight = lines.length * lineHeight;
+  let startY = Math.round((height - totalHeight) / 2) - 40;
+
+  // draw lines
+  for(let i=0;i<lines.length;i++){
+    ctx.fillText(lines[i], width/2, startY + i*lineHeight);
+  }
+
+  // meta line (author)
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.font = `500 28px ${chosenFont}`;
+  ctx.fillText(authorLine, width/2, startY + totalHeight + 32);
+
+  // prepare dataURL and download
+  if(format === 'jpg'){
+    const data = canvas.toDataURL('image/jpeg', 0.92);
+    triggerDownload(data, `quote-${slugify(selectedAuthor)}.jpg`);
+  } else {
+    const data = canvas.toDataURL('image/png');
+    triggerDownload(data, `quote-${slugify(selectedAuthor)}.png`);
+  }
+}
+function triggerDownload(dataUrl, filename){
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+/* choose font size heuristically */
+function determineFontSize(text){
+  const len = text.length;
+  if(len < 60) return 78;
+  if(len < 120) return 62;
+  if(len < 220) return 50;
+  return 44;
+}
+/* wrap for canvas (uses ctx.measureText) */
+function wrapTextCanvas(ctx, text, maxWidth){
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for(let i=0;i<words.length;i++){
+    const test = line ? (line + ' ' + words[i]) : words[i];
+    const w = ctx.measureText(test).width;
+    if(w > maxWidth && i>0){
+      lines.push(line);
+      line = words[i];
+    } else {
+      line = test;
+    }
+  }
+  if(line) lines.push(line);
+  if(lines.length > 20) return [lines.slice(0,10).join(' '), lines.slice(10).join(' ')];
+  return lines;
+}
+
+/* ---------- Event wiring ---------- */
+startBtn.addEventListener('click', ()=>{
+  startScreen.style.display = 'none';
+  controls.style.display = 'flex';
+  populateCategories();
+  const first = categorySelect.value || Object.keys(CATEGORIES)[0];
+  loadCategory(first);
+});
+categorySelect.addEventListener('change', (e)=> loadCategory(e.target.value));
+loadMoreBtn.addEventListener('click', loadMoreAuthors);
+fontBtn.addEventListener('click', cycleFont);
+bgBtn.addEventListener('click', cycleBackground);
+changeQuoteBtn.addEventListener('click', nextQuote);
+downloadSelect.addEventListener('change', function(){
+  const v = this.value;
+  if(!v) return;
+  downloadHD(v);
+  this.value = '';
+});
+resetBtn.addEventListener('click', ()=>{
+  startScreen.style.display = 'flex';
+  controls.style.display = 'none';
+  previewPanel.style.display = 'none';
+  actionRow.style.display = 'none';
+  selectedAuthor = null; quotesForAuthor=[]; visibleCount=0;
+  fontIndex = 0; bgIndex = 0;
+  fillStartWords();
+});
+
+/* ---------- Init ---------- */
+(function init(){
+  fillStartWords();
+  populateCategories();
+  startScreen.style.display = 'flex';
+  controls.style.display = 'none';
+  previewPanel.style.display = 'none';
+  actionRow.style.display = 'none';
+  fontBtn.textContent = `Font: ${FONTS[fontIndex].name}`;
+  bgBtn.textContent = `Background: ${BG_PALETTE[bgIndex].label}`;
+})();
+
+</script>
+</body>
+</html>
